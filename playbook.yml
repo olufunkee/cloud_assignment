@@ -1,0 +1,59 @@
+---
+- name: Deploy Open Source App with Apache
+  hosts: all
+  become: yes
+
+  vars:
+    app_name: "Altschool-first-assignment"
+    app_repo: "https://github.com/olufunkee/Altschool-first-assignment.git"
+    app_deploy_path: "/var/www/html/{{ app_name }}"
+    apache_service_name:
+      CentOS: httpd
+      Ubuntu: apache2
+
+  tasks:
+    - name: Install Apache on CentOS
+      ansible.builtin.yum:
+        name: httpd
+        state: present
+      when: ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+
+    - name: Install Apache on Ubuntu
+      ansible.builtin.apt:
+        name: apache2
+        state: present
+      when: ansible_distribution == 'Ubuntu'
+
+    - name: Install Git on CentOS
+      ansible.builtin.yum:
+        name: git
+        state: present
+
+    - name: Clone App Repository
+      ansible.builtin.git:
+        repo: "{{ app_repo }}"
+        dest: "{{ app_deploy_path }}"
+        update: yes
+
+    - name: Set Permissions for App Directory
+      ansible.builtin.file:
+        path: "{{ app_deploy_path }}"
+        owner: apache
+        group: apache
+        recurse: yes
+        mode: "0755"
+
+    - name: Configure Apache Virtual Host for App
+      ansible.builtin.template:
+        src: "apache_vhost.conf.j2"
+        dest: "/etc/httpd/conf.d/{{ app_name }}.conf"
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart Apache
+
+  handlers:
+    - name: Restart Apache
+      ansible.builtin.service:
+        name: "{{ apache_service_name[ansible_distribution] }}"
+        state: restarted
